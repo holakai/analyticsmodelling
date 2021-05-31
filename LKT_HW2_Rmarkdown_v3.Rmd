@@ -1,0 +1,314 @@
+---
+title: ""
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 4.1.
+> Describe a situation or problem from your job, everyday life, current events, etc., for which a clustering model would be appropriate. List some (up to 5) predictors that you might use.
+
+__Situation__
+
+I am curious about clustering the type of employees at my current workplace.
+
+__Predictors__
+
+* Salary 
+* Position (Categorical - Analyst, Manager, Director)
+* Number of days employed at this company company
+* Employee's most recent performance score (5 = FE (Far Exceeds expectations), 4 = EX (Exceeds Expectations), 3 = ME (Meets Expectations), 2 = DR (Development Required), and 1 = IR (Improvement Required).)
+* % overwork days (Calculated by number of days employee works for more than 8 hours / total number of days employed at this company)
+
+##  Question 4.2.
+> Use the R function kmeans to cluster the points as well as possible. 
+(a) Report the best combination of predictors, 
+(b) your suggested value of k, 
+(c) and how well your best clustering predicts flower type.
+
+__Approach__
+
+I combine finding both (a) best combination and (b) suggested k value, through using a user defined function, to pass in different (a) combinations of columns and (b) different values of k
+
+
+__Steps__
+
+(a) Since we have 4 different predictors, the  best combination of predictors can be 2 combinations,3 combinations or the 4 (all) combination. I create a list (predictorsCombis) and pass in the different possible predictor combinations into the function
+
+(b.1) To find a good value of k, I loop through a range of k values. Since I will be using the elbow diagram to determine a good value of k, I can start with a narrow range of k first (k=2 to 7) to check the resulting elbow diagram, and increase the upper range of k, if necessary. 
+
+(b.2) In lecture 4.4, Prof Sokol explained about the elbow diagram that is used to determine the optimal value of k (by charting the total distance of data points to its  cluster center)
+* While in homework 1, I used  % correct predictions as my metric to find the most optimal value, since we are using kmeans (and typically unstructured data, where we don't know what the correct classification is), I will use the elbow diagram to determine the optimal k value.
+
+```{r q4_2_a}
+
+rm(list=ls())
+set.seed(123) 
+library(tidyverse)
+
+iris <- read.table("C:/Users/k.loh/OneDrive - SKIM/ISYE 6501/week_2_Homework-summer/week 2 data-summer/data 4.2/iris.txt", stringsAsFactors = FALSE, header=TRUE)
+
+#Question to Menno on scaling, there seems to be two methods: 
+#[1]
+scdata <- iris # initialize value/size of sdata
+for (i in 1:4) { scdata[,i] <- (iris[,i]-min(iris[,i]))/(max(iris[,i])-min(iris[,i])) }
+
+#[2] Using R's scale function
+scalediris<- scale(iris[,-ncol(iris)])
+  
+func_kmeans <- function(data, k_val) {
+  pred <- c()
+  iris_clusters <- kmeans(data,k_val,nstart=20) 
+  
+  pred <- iris_clusters$tot.withinss
+  
+  return(pred)
+} 
+
+#Question to Menno on piping in different column combinations into my function, I can't seem to make it such that R would read these as column combinations together (it is treating it as looping column by column... would you know how best to make sure that R is using my columns e.g. 1:2 together?)
+predictorsCombis <- c(c(iris[,1:2]),c(iris[,1:3]),c(iris[,1:4]))
+k_list <- c(2:5)
+kmeans_accu <- c()
+
+for (predictorsCombi in predictorsCombis){
+  for (k_val in k_list) {
+  kmeans_accu <- c(kmeans_accu, k_val, func_kmeans(predictorsCombi, k_val))
+  }
+}
+
+kmeans_accu
+```
+
+__Observations__
+From the elbow diagram, there is a kink at k=3, where after the marginal benefit of increasing the cluster size is small, hence I use k=3 as the suggested value.
+
+
+
+> (b)your suggested value of k
+
+
+
+
+```{r q2_4_2b, cache=TRUE}
+
+
+```
+
+__Output__
+
+> (c) and how well your best clustering predicts flower type.
+
+To claculate how well k=3 predicts flower type, I use the % of between_ss/ total_ss output from kmeans.
+
+Background resource I found online: between_ss means high variance between the clusters (hence low similarity between groups) and total_ss is the sum of squared distances of each observation to the overall sample avg
+(https://discuss.analyticsvidhya.com/t/interpretation-result-of-k-means-algorithm/17750) 
+(https://stats.stackexchange.com/questions/82776/what-does-total-ss-and-between-ss-mean-in-k-means-clustering)
+
+
+```{r q2_4_2c, cache=TRUE}
+
+kmeans(iris[,1:4],3,n=20)
+```
+
+From the output the percentage of 88.4% indicates that k=3 is a good fit 
+
+Within cluster sum of squares by cluster:
+[1] 39.82097 23.87947 15.15100
+ (between_SS / total_SS =  88.4 %)
+ 
+ 
+ # Bonus calculations -> compare classification with actual data in column 5
+
+##  Question 5.1.
+> Using crime data from the file uscrime.txt (http://www.statsci.org/data/general/uscrime.txt, description at http://www.statsci.org/data/general/uscrime.html), test to see whether there are any outliers in the last column (number of crimes per 100,000 people).  Use the grubbs.test function in the outliers package in R.
+
+Found some helpful resources:
+https://www.youtube.com/watch?v=kc9O5XfV2pc
+https://www.statology.org/grubbs-test-r/
+https://statsandr.com/blog/outliers-detection-in-r/
+https://statsandr.com/blog/outliers-detection-in-r/
+https://stats.stackexchange.com/questions/3136/how-to-perform-a-test-using-r-to-see-if-data-follows-normal-distribution
+
+__Boxplot__ 
+
+Before using the Grubb's test, I use a simple boxplot to visualize the $crime data's distribution, and highlight any potential outliers using the boxplot.stats out function
+
+```{r q5_1boxplot}
+
+#Read data
+crimes <- read.table("C:/Users/k.loh/OneDrive - SKIM/ISYE 6501/week_2_Homework-summer/week 2 data-summer/data 5.1/uscrime.txt", stringsAsFactors = FALSE, header=TRUE)
+
+#Use a boxplot to visually detect any outliers
+boxplot(crimes$Crime, ylab="Crime rate: number of offenses per 100,000 population in 1960")
+
+#View any potential outliers - 
+#QUestion: stats out uses IQR right?
+out <- boxplot.stats(crimes$Crime)$out
+out_index <- which(crimes$Crime %in% c(out))
+out_index 
+
+#View the specific potential outlying rows
+crimes[out_index,]
+
+```
+
+__Observations__
+
+* __Box plot__ Using the  function 'boxplot.stats()$out' indicates that there are 3 potential outliers (1969 1674 1993). I now proceed to use the Grubb's test
+
+__Some background on Grubb's__ (Given it has not been mentioned in our lectures)
+
+Grubb's test assumes that the dataset is normally distributed. Knowing this, my approach is then to first check if the 'Crime' column data is normally distributed
+
+__Steps__
+
+To check if the 'Crime' column is normally distributed, I use the following checks:
+
+#https://statsandr.com/blog/outliers-detection-in-r/
+
+* __Histogram__ to visualize the data's distribution
+* __Q-Q plot__ (i.e. quantile-quantile plot) a visual method to test for normality)
+* __Shapiro-Wilk test__ to test for normality 
+
+https://stats.stackexchange.com/questions/52293/r-qqplot-how-to-see-whether-data-are-normally-distributed
+
+```{r q5_1b}
+#Use histogram to check data's distrbution
+ggplot(crimes) + aes(x=Crime) + geom_histogram(binwidth = 30) 
+
+#Questino how do we set the binwidth?
+hist(crimes$Crime)
+
+#Question to Menno: Sohuld the shapiro test be tested on the dataset with the outliers REMOVED? 
+#Since from the crimes boxplot, I can remove the 2 values that look like outliers
+#Other questions are generally on how to interpret the different results based on shapiro, qq, and grubbstest
+
+```
+
+* __Histogram__ From the histogram, the distribution of $crime skews more to the left, suggesting that the data doesn't follow a normal distribution. I now visualize the data on a qq plot.
+
+```{r q5_1_qqplot}
+library("ggpubr")
+#I use ggqqplot over qqnorm as it shows us the 45 degrees reference line
+ggqqplot(crimes$Crime) + ggtitle("QQplot of crime data")
+
+#qqnorm doesn't give the 45 degrees line
+#qqnorm(crimes$Crime)
+
+```
+
+__Some background on QQplot__
+https://www.datanovia.com/en/lessons/normality-test-in-r/
+https://stats.stackexchange.com/questions/52293/r-qqplot-how-to-see-whether-data-are-normally-distributed
+
+The QQ plot  draws the correlation between a given sample and the normal distribution. If the data is normally distributed, the dots (observation) should form a straight line along the 45-degrees reference line.
+
+__Observations__
+
+* The qqplot doesn't show a clear straight line, it is slightly bent.
+* Furthermore, the highest 5 points and lowest 1 point lies further away form the 45 degrees reference line, suggesting that the $crimes data is not normally distributed
+* I now test for normality using the Shapiro-Wilk test.
+
+```{r q5_1shapiro}
+
+#Shapiro-Wilk test
+shapiro.test(crimes$Crime)
+
+```
+
+* __Shapiro-Wilk normality test__ 
+
+Results:
+
+	Shapiro-Wilk normality test
+
+data:  crimes$Crime
+W = 0.91273, p-value = 0.001882
+
+__Some background on Shapiro-Wilk test__
+* The Shapiro-Wilk null hypothesis is that the data is normally distributed.
+
+__Observations__
+Taking an alpha-value of 0.05, since the  the p-value (0.001882) is <0.05, the null hypothesis is rejected, meaning that the $crime data is not normally distributed.
+
+Even though these 3 different tests has established that the crime data is not normally distributed, I move on to do the Grubbs test. I run the Grubbs test on both the highest and lowest value of the $crime data.
+
+
+```{r q5_1_b_grubbs}
+#Grubb's test on the highest value (max)
+grubbs.test(crimes$Crime, type=10)
+crimes[which.max(crimes$Crime),]
+
+#Grubb's test on the lowest value (min)
+grubbs.test(crimes$Crime, opposite = TRUE)
+crimes[which.min(crimes$Crime),]
+```
+
+__More background on Grubb's test__
+
+The Grubb's test's null hypothesis is: There are no outliers in the data set
+Alternate hypothesis: The lowest / highest value is an outlier in the data set (lowest / highest value depending on the settings of the Grubb's test)
+With that, we will reject the null hypothesis and conclude that the lowest / highest value is an outlier, if the p-value is < than the significance level of 0.05.
+
+__Results from Grubb's test on crime data__
+	Grubbs test for one outlier
+
+data:  crimes$Crime
+G = 2.81287, U = 0.82426, p-value =
+0.07887
+alternative hypothesis: highest value 1993 is an outlier
+
+	Grubbs test for one outlier
+
+data:  crimes$Crime
+G = 1.45589, U = 0.95292, p-value = 1
+alternative hypothesis: lowest value 342 is an outlier
+
+__Observations__
+Output from the Grubb's test shows that the lowest (342) and highest (1993) values are outliers.
+
+I compare the results from the Grubb's test with the earlier normality checks (qqplot and Shapiro-Wilk test). Referring back to the earlier qqplot, the qqplot does support that the highest value is an outlier.
+
+//Question: On how do I reconcile the output from the Grubb's test, knowing that the data is NOT normally distributed? 
+
+The lowest value might not be an outlier as it ... question
+__
+
+
+##  Question 6.1.
+> Describe a situation or problem from your job, everyday life, current events, etc., for which a Change Detection model would be appropriate. Applying the CUSUM technique, how would you choose the critical value and the threshold?
+
+Change detection - 
+
+##  Question 6.1.
+> 1.	Using July through October daily-high-temperature data for Atlanta for 1996 through 2015, use a CUSUM approach to identify when unofficial summer ends (i.e., when the weather starts cooling off) each year.  
+
+__Approach__
+
+Since we are looking for when summer ends (weather starts cooling off), the cusum formula I use would be the one that detects decreases. The 3 variables I need are: mean, 
+Since we have year on year data, I calculate cusum for each year
+To use the cusum formula, I use July average as the mean
+
+As mean is the expectation for summer, I use average temperature in July (assuming July is always summer) as the proxy for summer
+
+```{r q6_2}
+set.seed(126)
+
+#qcc package for cusum
+library(qcc)
+data <- read.table("C:/Users/k.loh/OneDrive - SKIM/ISYE 6501/week_2_Homework-summer/week 2 data-summer/data 6.2/temps.txt", stringsAsFactors = FALSE, header=TRUE)
+
+
+
+```
+
+
+> 2. Use a CUSUM approach to make a judgment of whether Atlanta’s summer climate has gotten warmer in that time (and if so, when).
+
+
+__Conclusion:__
